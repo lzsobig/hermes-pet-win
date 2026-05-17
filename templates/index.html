@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Pet Win</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f0f23;--card:#1a1a2e;--card2:#2d2d44;
+  --text:#e2e8f0;--muted:#94a3b8;--accent:#7dd3fc;
+  --green:#4ade80;--red:#f87171;--amber:#f59e0b;
+  --purple:#f0abfc;--radius:12px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Dynamic Island */
+.island{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:100;
+  background:var(--card);border-radius:20px;padding:8px 20px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);transition:all .3s ease;cursor:pointer;min-width:200px}
+.island:hover{transform:translateX(-50%) translateY(4px);box-shadow:0 8px 32px rgba(0,0,0,.7)}
+.island-dot{width:12px;height:12px;border-radius:50%;background:var(--green);flex-shrink:0;transition:background .3s}
+.island-dot.thinking{animation:pulse 1s infinite}
+.island-dot.done{background:var(--green)}
+.island-dot.error{background:var(--amber)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.island-mode{font-weight:700;font-size:13px;white-space:nowrap}
+.island-status{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
+.island-preview{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:8px;
+  background:var(--card2);border-radius:var(--radius);padding:12px 16px;max-width:360px;
+  font-size:12px;color:var(--muted);line-height:1.5;display:none;
+  box-shadow:0 4px 24px rgba(0,0,0,.5)}
+.island:hover .island-preview{display:block}
+
+/* Main layout */
+.main{flex:1;display:flex;flex-direction:column;padding:60px 0 0 0}
+.chat-container{flex:1;display:flex;flex-direction:column;max-width:800px;width:100%;margin:0 auto;padding:0 16px}
+
+/* Messages */
+.messages{flex:1;overflow-y:auto;padding:16px 0;display:flex;flex-direction:column;gap:12px}
+.msg{padding:10px 16px;border-radius:var(--radius);max-width:85%;line-height:1.6;font-size:14px;word-break:break-word}
+.msg.user{background:var(--accent);color:#0f0f23;align-self:flex-end;border-bottom-right-radius:4px}
+.msg.ai{background:var(--card2);align-self:flex-start;border-bottom-left-radius:4px}
+.msg.ai pre{background:#0d0d1f;padding:8px 12px;border-radius:6px;overflow-x:auto;margin:8px 0;font-size:13px}
+.msg.ai code{font-family:'Consolas','Courier New',monospace;font-size:13px}
+.msg.ai p{margin:4px 0}
+.msg.ai ul,.msg.ai ol{margin:4px 0 4px 20px}
+.msg.ai strong{color:var(--purple)}
+.msg.error{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.typing{display:flex;gap:4px;padding:12px 16px}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bounce .6s infinite}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+/* Input */
+.input-bar{padding:12px 16px;display:flex;gap:8px;background:var(--card);border-top:1px solid rgba(255,255,255,.05)}
+.input-bar textarea{flex:1;background:var(--card2);border:none;border-radius:var(--radius);padding:10px 14px;
+  color:var(--text);font-size:14px;resize:none;font-family:inherit;outline:none;min-height:42px;max-height:120px}
+.input-bar textarea::placeholder{color:var(--muted)}
+.btn-send{background:var(--accent);color:var(--bg);border:none;border-radius:var(--radius);padding:10px 20px;
+  font-weight:700;font-size:14px;cursor:pointer;transition:background .2s}
+.btn-send:hover{background:#38bdf8}
+.btn-send:disabled{opacity:.4;cursor:not-allowed}
+
+/* Toolbar */
+.toolbar{display:flex;gap:8px;padding:8px 16px;background:var(--card)}
+.toolbar button{background:var(--card2);border:none;color:var(--muted);padding:6px 12px;border-radius:8px;
+  font-size:12px;cursor:pointer;transition:all .2s}
+.toolbar button:hover{background:var(--accent);color:var(--bg)}
+.toolbar .active{background:var(--accent);color:var(--bg)}
+
+/* Settings panel */
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;
+  align-items:center;justify-content:center}
+.settings-overlay.show{display:flex}
+.settings{background:var(--card);border-radius:16px;padding:24px;width:420px;max-width:90vw}
+.settings h2{margin-bottom:16px;font-size:18px}
+.settings label{display:block;color:var(--muted);font-size:13px;margin:12px 0 4px}
+.settings input{width:100%;background:var(--card2);border:none;border-radius:8px;padding:10px 12px;
+  color:var(--text);font-size:13px;font-family:Consolas,monospace;outline:none}
+.settings .btn-row{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.settings .btn-save{background:var(--accent);color:var(--bg);border:none;border-radius:8px;
+  padding:8px 20px;font-weight:700;cursor:pointer}
+.settings .btn-cancel{background:var(--card2);color:var(--muted);border:none;border-radius:8px;
+  padding:8px 20px;cursor:pointer}
+
+/* Pet sprite (CSS animation) */
+.pet{position:fixed;bottom:20px;right:20px;z-index:50;cursor:pointer;transition:transform .2s}
+.pet:hover{transform:scale(1.1) translateY(-4px)}
+.pet canvas{image-rendering:pixelated}
+
+/* Responsive */
+@media(max-width:600px){
+  .island{min-width:160px;padding:6px 14px}
+  .msg{max-width:95%}
+}
+</style>
+</head>
+<body>
+
+<!-- Dynamic Island -->
+<div class="island" id="island" onclick="toggleSettings()">
+  <div class="island-dot" id="islandDot"></div>
+  <span class="island-mode" id="islandMode">✦ mimo</span>
+  <span class="island-status" id="islandStatus">就绪</span>
+  <div class="island-preview" id="islandPreview"></div>
+</div>
+
+<!-- Main Chat -->
+<div class="main">
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="msg ai">你好！我是 Hermes AI 伴侣。有什么可以帮你的？</div>
+    </div>
+    <div class="input-bar">
+      <textarea id="input" rows="1" placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="btn-send" id="sendBtn" onclick="sendMessage()">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pet Canvas -->
+<div class="pet" id="petWrap">
+  <canvas id="petCanvas" width="64" height="64"></canvas>
+</div>
+
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings">
+    <h2>✦ API 配置</h2>
+    <label>API Key</label>
+    <input id="cfgKey" type="password" placeholder="sk-...">
+    <label>API 地址</label>
+    <input id="cfgUrl" value="">
+    <label>模型</label>
+    <input id="cfgModel" value="">
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="toggleSettings()">取消</button>
+      <button class="btn-save" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const messages = [];
+let isStreaming = false;
+
+// --- Markdown renderer (simple) ---
+function renderMd(text) {
+  let html = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    .replace(/\n/g, '<br>');
+  html = html.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
+  return html;
+}
+
+function addMsg(role, text, streaming = false) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (streaming) div.id = 'streaming-msg';
+  div.innerHTML = role === 'ai' ? renderMd(text) : text.replace(/\n/g, '<br>');
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
+  return div;
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.className = 'typing';
+  div.id = 'typing';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
+}
+
+function removeTyping() {
+  const el = $('typing');
+  if (el) el.remove();
+}
+
+// --- Send message ---
+async function sendMessage() {
+  const input = $('input');
+  const text = input.value.trim();
+  if (!text || isStreaming) return;
+
+  input.value = '';
+  autoResize(input);
+  addMsg('user', text);
+  messages.push({ role: 'user', content: text });
+
+  isStreaming = true;
+  $('sendBtn').disabled = true;
+  setIsland('thinking', '思考中...');
+  addTyping();
+
+  let aiText = '';
+  let streamDiv = null;
+
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    });
+
+    removeTyping();
+    streamDiv = addMsg('ai', '', true);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value);
+      for (const line of chunk.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.error) {
+            streamDiv.className = 'msg error';
+            streamDiv.textContent = '错误: ' + data.error;
+          } else if (data.done) {
+            messages.push({ role: 'assistant', content: data.full });
+            setIsland('done', data.full.slice(0, 80));
+          } else if (data.content) {
+            aiText += data.content;
+            streamDiv.innerHTML = renderMd(aiText);
+            $('messages').scrollTop = $('messages').scrollHeight;
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {
+    removeTyping();
+    if (streamDiv) {
+      streamDiv.className = 'msg error';
+      streamDiv.textContent = '连接错误: ' + e.message;
+    } else {
+      addMsg('error', '连接错误: ' + e.message);
+    }
+    setIsland('error', e.message);
+  }
+
+  isStreaming = false;
+  $('sendBtn').disabled = false;
+  setTimeout(() => setIsland('idle', '就绪'), 3000);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// --- Island ---
+function setIsland(state, preview) {
+  const dot = $('islandDot');
+  dot.className = 'island-dot ' + state;
+  const labels = { thinking: '思考中...', done: '完成', error: '错误', idle: '就绪' };
+  $('islandStatus').textContent = labels[state] || state;
+  if (preview) $('islandPreview').textContent = preview;
+}
+
+// --- Settings ---
+async function loadSettings() {
+  const resp = await fetch('/api/config');
+  const cfg = await resp.json();
+  $('cfgUrl').value = cfg.api.base_url;
+  $('cfgModel').value = cfg.api.model;
+  if (cfg.api.api_key_masked) $('cfgKey').placeholder = cfg.api.api_key_masked;
+}
+
+function toggleSettings() {
+  const el = $('settingsOverlay');
+  el.classList.toggle('show');
+  if (el.classList.contains('show')) loadSettings();
+}
+
+async function saveSettings() {
+  const data = {};
+  const key = $('cfgKey').value.trim();
+  if (key) data.api_key = key;
+  data.base_url = $('cfgUrl').value.trim();
+  data.model = $('cfgModel').value.trim();
+  await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  toggleSettings();
+}
+
+// --- Pixel Pet ---
+(function initPet() {
+  const canvas = $('petCanvas');
+  const ctx = canvas.getContext('2d');
+  let frame = 0;
+
+  function draw() {
+    ctx.clearRect(0, 0, 64, 64);
+    const s = 4; // pixel scale
+    const cx = 32, cy = 32;
+
+    // Body
+    ctx.fillStyle = '#ff9f43';
+    ctx.fillRect(cx-4*s, cy-1*s, 8*s, 6*s);
+
+    // Ears
+    ctx.beginPath();
+    ctx.moveTo(cx-4*s, cy-1*s);
+    ctx.lineTo(cx-2*s, cy-5*s);
+    ctx.lineTo(cx-0*s, cy-1*s);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx+0*s, cy-1*s);
+    ctx.lineTo(cx+2*s, cy-5*s);
+    ctx.lineTo(cx+4*s, cy-1*s);
+    ctx.fill();
+
+    // Eyes (blink every 3s)
+    const blink = (frame % 150) > 145;
+    ctx.fillStyle = '#1a1a2e';
+    if (blink) {
+      ctx.fillRect(cx-3*s, cy+1*s, 2*s, 1);
+      ctx.fillRect(cx+1*s, cy+1*s, 2*s, 1);
+    } else {
+      ctx.beginPath();
+      ctx.arc(cx-2*s, cy+1*s, s*0.6, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx+2*s, cy+1*s, s*0.6, 0, Math.PI*2);
+      ctx.fill();
+      // Shine
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(cx-2*s, cy+0.5*s, 1, 1);
+      ctx.fillRect(cx+2*s, cy+0.5*s, 1, 1);
+    }
+
+    // Mouth
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.arc(cx, cy+3*s, s, 0, Math.PI);
+    ctx.stroke();
+
+    // Tail
+    const tailY = Math.sin(frame * 0.1) * 2;
+    ctx.strokeStyle = '#ff9f43';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx+4*s, cy+2*s);
+    ctx.quadraticCurveTo(cx+6*s, cy+tailY, cx+5*s, cy-2*s);
+    ctx.stroke();
+
+    frame++;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// Init
+loadSettings();
+</script>
+</body>
+</html>
