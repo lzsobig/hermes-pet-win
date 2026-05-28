@@ -148,13 +148,19 @@ class HermesPetApp:
         self.island.set_state("idle", summary)
 
     def _on_event(self, event_type, data):
+        """事件处理 - 批量更新 UI 减少刷新"""
         state_map = {
             "job_started": "thinking", "job_finished": "done", "job_failed": "error",
         }
         state = state_map.get(event_type, "idle")
         name = data.get("name", "")
-        self.root.after(0, lambda: self.island.set_state(state, name))
-        self.root.after(0, lambda: self.tray.update_state(state, name))
+        
+        # 批量更新，避免多次调用
+        def update_ui():
+            self.island.set_state(state, name)
+            self.tray.update_state(state, name)
+        
+        self.root.after(0, update_ui)
 
     def _on_ai_state(self, state, preview=""):
         self.island.set_state(state, preview)

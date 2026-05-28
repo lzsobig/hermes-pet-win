@@ -124,14 +124,14 @@ class ChatWindow:
         self.chat_area.config(state="disabled")
 
     def _append_text(self, text: str, tag: str = None):
-        """追加文本到聊天区"""
+        """追加文本到聊天区 - 批量更新减少刷新次数"""
         self.chat_area.config(state="normal")
         if tag:
             self.chat_area.insert("end", text, tag)
         else:
             self.chat_area.insert("end", text)
-        self.chat_area.see("end")
         self.chat_area.config(state="disabled")
+        self.chat_area.see("end")
 
     def _render_markdown_line(self, line: str):
         """简单 Markdown 单行渲染"""
@@ -196,16 +196,31 @@ class ChatWindow:
         if self.ai_client:
             self._stream_buf = ""
             self._append_text("  AI: ", "ai_msg")
+            
+            # 批量累积 chunk 减少 UI 刷新次数
+            chunk_buffer = []
+            buffer_size = 4  # 每 4 个字符刷新一次
+
+            def flush_buffer():
+                nonlocal chunk_buffer
+                if chunk_buffer:
+                    text_to_add = "".join(chunk_buffer)
+                    self.root.after(0, lambda: self._append_text(text_to_add, "ai_msg"))
+                    chunk_buffer = []
 
             def on_chunk(chunk, full):
-                self.root.after(0, lambda: self._append_text(chunk, "ai_msg"))
+                chunk_buffer.append(chunk)
+                if len(chunk_buffer) >= buffer_size:
+                    flush_buffer()
 
             def on_done(full):
+                flush_buffer()  # 刷新剩余缓冲
                 self.messages.append({"role": "assistant", "content": full})
                 if self.on_state_change:
                     self.root.after(0, lambda: self.on_state_change("done", full))
 
             def on_error(err):
+                flush_buffer()  # 清空缓冲
                 self.root.after(0, lambda: self._append_text(
                     f"\n  [错误] {err}\n", "error"))
                 if self.on_state_change:

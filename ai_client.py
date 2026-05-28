@@ -4,6 +4,8 @@ import requests
 import threading
 import subprocess
 import os
+from typing import Optional, Callable
+from concurrent.futures import ThreadPoolExecutor
 
 
 class AIClient:
@@ -13,7 +15,15 @@ class AIClient:
         self.model = config["api"]["model"]
         self.max_tokens = config["api"]["max_tokens"]
         self.temperature = config["api"]["temperature"]
-        self.backend = config["api"].get("backend", "openai")  # "openai" or "claude"
+        self.backend = config["api"].get("backend", "openai")
+        # 连接池复用
+        self._session = requests.Session()
+        self._session.headers.update({
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        })
+        # 线程池
+        self._executor = ThreadPoolExecutor(max_workers=3)
 
     def update_config(self, config: dict):
         self.base_url = config["api"]["base_url"]
@@ -22,6 +32,10 @@ class AIClient:
         self.max_tokens = config["api"]["max_tokens"]
         self.temperature = config["api"]["temperature"]
         self.backend = config["api"].get("backend", "openai")
+        # 更新 session headers
+        self._session.headers.update({
+            "Authorization": f"Bearer {self.api_key}",
+        })
 
     def chat_stream(self, messages: list, on_chunk=None, on_done=None, on_error=None):
         """流式调用 AI"""
@@ -34,10 +48,7 @@ class AIClient:
         """OpenAI 兼容 API 流式"""
         def _worker():
             try:
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.api_key}",
-                }
+                url = f"{self.base_url}/chat/completions"
                 payload = {
                     "model": self.model,
                     "messages": messages,
@@ -45,9 +56,7 @@ class AIClient:
                     "temperature": self.temperature,
                     "stream": True,
                 }
-                url = f"{self.base_url}/chat/completions"
-                resp = requests.post(url, headers=headers, json=payload,
-                                     stream=True, timeout=120)
+                resp = self._session.post(url, json=payload, stream=True, timeout=120)
                 resp.raise_for_status()
 
                 full_text = ""
@@ -144,18 +153,21 @@ class AIClient:
         path = shutil.which("claude")
         if path:
             return path
-        # 常见路径
-        candidates = [
-            os.path.expanduser("~/.npm-global/bin/claude"),
-            os.path.expanduser("~/node_modules/.bin/claude"),
-            "C:/npm-global/claude.cmd",
-            "C:/npm-global/claude",
-            "/usr/local/bin/claude",
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                return c
-        return ""
+        # 常见路径 (缓存结果避免重复查找)
+        if not hasattr(self, '_claude_path_cache'):
+            self._claude_path_cache = None
+            candidates = [
+                os.path.expanduser("~/.npm-global/bin/claude"),
+                os.path.expanduser("~/node_modules/.bin/claude"),
+                "C:/npm-global/claude.cmd",
+                "C:/npm-global/claude",
+                "/usr/local/bin/claude",
+            ]
+            for c in candidates:
+                if os.path.exists(c):
+                    self._claude_path_cache = c
+                    break
+        return self._claude_path_cache or ""
 
     def chat_sync(self, messages: list) -> str:
         """同步调用"""
@@ -165,10 +177,6 @@ class AIClient:
 
     def _openai_sync(self, messages) -> str:
         try:
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            }
             payload = {
                 "model": self.model,
                 "messages": messages,
@@ -177,7 +185,7 @@ class AIClient:
                 "stream": False,
             }
             url = f"{self.base_url}/chat/completions"
-            resp = requests.post(url, headers=headers, json=payload, timeout=120)
+            resp = self._session.post(url, json=payload, timeout=120)
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"]
