@@ -39,24 +39,40 @@ DEFAULT_CONFIG = {
 }
 
 
+# 配置缓存
+_config_cache = None
+_conversations_cache = None
+_jobs_cache = None
+
+
 def ensure_config_dir():
     os.makedirs(CONFIG_DIR, exist_ok=True)
 
 
 def load_config() -> dict:
+    """加载配置 - 带缓存"""
+    global _config_cache
+    if _config_cache is not None:
+        return _config_cache.copy()
+    
     ensure_config_dir()
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             user_cfg = json.load(f)
         merged = _deep_merge(DEFAULT_CONFIG, user_cfg)
-        return merged
+        _config_cache = merged
+        return merged.copy()
     else:
         save_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG.copy()
+        _config_cache = DEFAULT_CONFIG.copy()
+        return _config_cache
 
 
 def save_config(cfg: dict):
+    """保存配置 - 更新缓存"""
+    global _config_cache
     ensure_config_dir()
+    _config_cache = cfg.copy()
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
 
@@ -72,28 +88,48 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def load_conversations() -> list:
+    """加载对话历史 - 带缓存"""
+    global _conversations_cache
+    if _conversations_cache is not None:
+        return _conversations_cache.copy()
+    
     ensure_config_dir()
     if os.path.exists(CONVERSATIONS_PATH):
         with open(CONVERSATIONS_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        _conversations_cache = data
+        return data.copy()
     return []
 
 
 def save_conversations(convs: list):
+    """保存对话历史 - 更新缓存"""
+    global _conversations_cache
     ensure_config_dir()
+    _conversations_cache = convs.copy()
     with open(CONVERSATIONS_PATH, "w", encoding="utf-8") as f:
         json.dump(convs, f, indent=2, ensure_ascii=False)
 
 
 def load_jobs() -> list:
+    """加载任务记录 - 带缓存"""
+    global _jobs_cache
+    if _jobs_cache is not None:
+        return _jobs_cache.copy()
+    
     ensure_config_dir()
     if os.path.exists(JOBS_PATH):
         with open(JOBS_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        _jobs_cache = data
+        return data.copy()
     return []
 
 
 def save_jobs(jobs: list):
+    """保存任务记录 - 更新缓存"""
+    global _jobs_cache
     ensure_config_dir()
+    _jobs_cache = jobs.copy()
     with open(JOBS_PATH, "w", encoding="utf-8") as f:
         json.dump(jobs, f, indent=2, ensure_ascii=False)

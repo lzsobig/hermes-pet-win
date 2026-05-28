@@ -1,8 +1,39 @@
+```
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.env
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.ENV.local
+
+# Logs
 *.log
+
+# IDE
 .vscode/
 .idea/
-.claude/settings.local.json
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Temp files
+*.tmp
+```

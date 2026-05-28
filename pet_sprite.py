@@ -122,10 +122,20 @@ class PetSprite:
 
     def _start_animation(self):
         """启动动画循环"""
+        self._last_frame_time = 0
         self._animate()
 
     def _animate(self):
-        """动画主循环"""
+        """动画主循环 - 基于时间戳的帧率控制"""
+        import time
+        current_time = int(time.time() * 1000)  # 毫秒
+        
+        # 限制帧率到 30 FPS (约 33ms 一帧)
+        if current_time - self._last_frame_time < 33:
+            self.root.after(10, self._animate)
+            return
+        self._last_frame_time = current_time
+        
         self.frame_idx += 1
 
         if self.state == self.STATE_IDLE:
